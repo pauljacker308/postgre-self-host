@@ -155,6 +155,35 @@ Sau khi chay xong, server backup se co:
 - file `_globals.sql` cho roles/quyen o muc cluster
 - file `.sha256` de kiem tra integrity
 
+## 5.1. Cach backup thu cong tung buoc
+
+Khi can tao backup ngay lap tuc tren server chinh, chay:
+
+```bash
+cd /opt/postgre-self-host
+./scripts/backup.sh
+```
+
+Sau khi chay xong, kiem tra danh sach backup dang co tren server backup:
+
+```bash
+./scripts/list_backups.sh
+```
+
+Neu muon kiem tra truc tiep tren server backup:
+
+```bash
+cd /srv/postgres-backups/tech-blog
+ls -lah
+```
+
+Quy trinh backup thu cong nen lam theo thu tu:
+
+1. Xac nhan PostgreSQL dang chay.
+2. Chay `./scripts/backup.sh`.
+3. Chay `./scripts/list_backups.sh`.
+4. Kiem tra tren server backup da co file `.dump`, `_globals.sql`, `.sha256`.
+
 ## 6. Bat backup dinh ky
 
 ```bash
@@ -165,7 +194,14 @@ sudo systemctl enable --now postgres-backup.timer
 sudo systemctl list-timers | grep postgres-backup
 ```
 
-Mac dinh timer dang la `hourly`.
+Mac dinh timer dang la `hourly`, tuc la hien tai chua backup theo ngay.
+
+Neu muon chay backup ngay lap tuc bang systemd ma khong doi lich:
+
+```bash
+sudo systemctl start postgres-backup.service
+sudo systemctl status postgres-backup.service
+```
 
 Neu muon backup moi ngay luc 02:00 sang, sua `/etc/systemd/system/postgres-backup.timer`:
 
@@ -181,6 +217,13 @@ Sau do reload:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart postgres-backup.timer
+```
+
+Sau khi doi sang daily, kiem tra lich:
+
+```bash
+sudo systemctl list-timers | grep postgres-backup
+systemctl cat postgres-backup.timer
 ```
 
 ## 7. Restore tu server backup
@@ -206,6 +249,41 @@ Script se:
 - restore du lieu tu file `.dump`
 
 Neu role da ton tai san, buoc restore `globals` co the in ra loi `already exists`. Script se bo qua cac loi nay va tiep tuc restore database.
+
+## 7.1. Cach restore thu cong tung buoc
+
+Khi can khoi phuc database tu 1 file backup cu the, lam theo thu tu:
+
+1. Xac dinh file backup can dung bang `./scripts/list_backups.sh`.
+2. Dam bao ban chap nhan ghi de toan bo database hien tai.
+3. Chay lenh restore voi ten file dump.
+4. Kiem tra lai bang table hoac du lieu sau restore.
+
+Lenh mau:
+
+```bash
+cd /opt/postgre-self-host
+./scripts/list_backups.sh
+./scripts/restore.sh primary_tech_blog_db_20260620_215653.dump
+```
+
+Kiem tra lai sau restore:
+
+```bash
+docker exec -e PGPASSWORD='your_db_password' pg-primary \
+  psql -U tech_blog_user -d tech_blog_db -c "\dt"
+
+docker exec -e PGPASSWORD='your_db_password' pg-primary \
+  psql -U tech_blog_user -d tech_blog_db -c "SELECT * FROM backup_test;"
+```
+
+Neu ban chi muon test restore, nen:
+
+1. Tao 1 record mau.
+2. Chay backup.
+3. Xoa record do.
+4. Chay restore tu file backup vua tao.
+5. Kiem tra record da quay lai hay chua.
 
 ## 8. Luu y quan trong
 
