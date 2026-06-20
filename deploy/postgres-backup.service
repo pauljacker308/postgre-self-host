@@ -1,0 +1,9 @@
+[Unit]
+Description=PostgreSQL Docker backup to remote server
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/postgre-self-host
+ExecStart=/opt/postgre-self-host/scripts/backup.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PostgreSQL backup periodically
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=postgres-backup.service
+
+[Install]
+WantedBy=timers.target
