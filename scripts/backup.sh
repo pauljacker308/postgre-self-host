@@ -25,8 +25,8 @@ required_vars=(
   BACKUP_REMOTE_HOST
   BACKUP_REMOTE_PORT
   BACKUP_REMOTE_USER
+  BACKUP_REMOTE_PASSWORD
   BACKUP_REMOTE_DIR
-  BACKUP_SSH_KEY
 )
 
 for var_name in "${required_vars[@]}"; do
@@ -46,7 +46,6 @@ resolve_path() {
 }
 
 LOCAL_DIR="$(resolve_path "$BACKUP_LOCAL_DIR")"
-SSH_KEY="$(resolve_path "$BACKUP_SSH_KEY")"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BASE_NAME="${BACKUP_FILENAME_PREFIX}_${POSTGRES_DB}_${TIMESTAMP}"
 DUMP_FILE="$LOCAL_DIR/${BASE_NAME}.dump"
@@ -55,20 +54,13 @@ CHECKSUM_FILE="$LOCAL_DIR/${BASE_NAME}.sha256"
 
 mkdir -p "$LOCAL_DIR"
 
-if [[ ! -f "$SSH_KEY" ]]; then
-  echo "Missing SSH key: $SSH_KEY"
-  exit 1
-fi
-
 if [[ "$(docker inspect -f '{{.State.Running}}' "$POSTGRES_CONTAINER_NAME" 2>/dev/null || true)" != "true" ]]; then
   echo "Container $POSTGRES_CONTAINER_NAME is not running."
   exit 1
 fi
 
 SSH_OPTS=(
-  -i "$SSH_KEY"
   -p "$BACKUP_REMOTE_PORT"
-  -o BatchMode=yes
   -o StrictHostKeyChecking=accept-new
 )
 
@@ -83,10 +75,10 @@ docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" "$POSTGRES_CONTAINER_NAME" \
 sha256sum "$DUMP_FILE" "$GLOBALS_FILE" >"$CHECKSUM_FILE"
 
 echo "Uploading backup to remote server"
-ssh "${SSH_OPTS[@]}" "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}" \
+SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e ssh "${SSH_OPTS[@]}" "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}" \
   "mkdir -p '$BACKUP_REMOTE_DIR'"
-rsync -az --progress \
-  -e "ssh -i $SSH_KEY -p $BACKUP_REMOTE_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e rsync -az --progress \
+  --rsh="ssh -p $BACKUP_REMOTE_PORT -o StrictHostKeyChecking=accept-new" \
   "$DUMP_FILE" "$GLOBALS_FILE" "$CHECKSUM_FILE" \
   "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}:${BACKUP_REMOTE_DIR}/"
 
@@ -94,7 +86,7 @@ echo "Cleaning local backups older than ${BACKUP_KEEP_LOCAL_DAYS:-2} day(s)"
 find "$LOCAL_DIR" -type f -mtime "+${BACKUP_KEEP_LOCAL_DAYS:-2}" -delete
 
 echo "Cleaning remote backups older than ${BACKUP_KEEP_REMOTE_DAYS:-14} day(s)"
-ssh "${SSH_OPTS[@]}" "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}" \
+SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e ssh "${SSH_OPTS[@]}" "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}" \
   "find '$BACKUP_REMOTE_DIR' -type f -mtime '+${BACKUP_KEEP_REMOTE_DAYS:-14}' -delete"
 
 echo "Backup completed successfully."

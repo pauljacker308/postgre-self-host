@@ -1,35 +1,33 @@
-# PostgreSQL self-host bằng Docker + backup sang server khác
+# PostgreSQL self-host bang Docker + backup sang server khac
 
-Project này giúp bạn:
+Project nay giup ban:
 
-- chạy PostgreSQL trên Ubuntu bằng Docker Compose
-- backup định kỳ bằng `pg_dump`
-- đẩy file backup sang 1 server khác qua SSH
-- restore ngược từ file backup khi cần
+- chay PostgreSQL tren Ubuntu bang Docker Compose
+- backup dinh ky bang `pg_dump`
+- day file backup sang 1 server khac qua SSH password
+- restore nguoc tu file backup khi can
 
-## 1. Cấu trúc
+## 1. Cau truc
 
-- `docker-compose.yml`: chạy PostgreSQL
-- `.env.example`: biến môi trường mẫu
-- `scripts/backup.sh`: tạo backup và copy sang server backup
-- `scripts/list_backups.sh`: liệt kê backup đang có trên server backup
-- `scripts/restore.sh`: tải file backup về và restore
+- `docker-compose.yml`: chay PostgreSQL
+- `.env.example`: bien moi truong mau
+- `scripts/backup.sh`: tao backup va copy sang server backup
+- `scripts/list_backups.sh`: liet ke backup dang co tren server backup
+- `scripts/restore.sh`: tai file backup ve va restore
 - `deploy/postgres-backup.service`: service `systemd`
 - `deploy/postgres-backup.timer`: timer `systemd`
 
-## 2. Chuẩn bị trên Ubuntu chính
+## 2. Chuan bi tren Ubuntu chinh
 
-### Cài Docker
+### Cai Docker va cong cu backup
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose-plugin rsync openssh-client
+sudo apt install -y docker.io docker-compose-plugin rsync openssh-client sshpass
 sudo systemctl enable --now docker
 ```
 
-### Copy project lên server
-
-Ví dụ:
+### Copy project len server
 
 ```bash
 sudo mkdir -p /opt/postgre-self-host
@@ -37,23 +35,23 @@ sudo chown -R "$USER":"$USER" /opt/postgre-self-host
 cd /opt/postgre-self-host
 ```
 
-### Tạo file `.env`
+### Tao file `.env`
 
 ```bash
 cp .env.example .env
-mkdir -p ssh backups/local
-chmod 700 ssh
+mkdir -p backups/local
+chmod 600 .env
 ```
 
-Sửa `.env` theo môi trường thật:
+Sua `.env` theo moi truong that:
 
 ```env
 POSTGRES_VERSION=16
 POSTGRES_CONTAINER_NAME=pg-primary
 POSTGRES_PORT=5432
-POSTGRES_DB=app_db
-POSTGRES_USER=app_user
-POSTGRES_PASSWORD=strong_password_here
+POSTGRES_DB=tech_blog_db
+POSTGRES_USER=tech_blog_user
+POSTGRES_PASSWORD=strong_db_password_here
 TZ=Asia/Bangkok
 
 BACKUP_LOCAL_DIR=./backups/local
@@ -61,57 +59,56 @@ BACKUP_FILENAME_PREFIX=primary
 BACKUP_KEEP_LOCAL_DAYS=2
 BACKUP_KEEP_REMOTE_DAYS=14
 
-BACKUP_REMOTE_HOST=10.10.10.20
+BACKUP_REMOTE_HOST=103.72.56.221
 BACKUP_REMOTE_PORT=22
-BACKUP_REMOTE_USER=backupuser
-BACKUP_REMOTE_DIR=/srv/postgres-backups/primary
-BACKUP_SSH_KEY=./ssh/backup_ed25519
+BACKUP_REMOTE_USER=root
+BACKUP_REMOTE_PASSWORD=strong_remote_password_here
+BACKUP_REMOTE_DIR=/srv/postgres-backups/tech-blog
 ```
 
-## 3. Chuẩn bị server backup
+## 3. Chuan bi server backup
 
-Server backup nên có `openssh-server` và `rsync`:
+Server backup nen co `openssh-server` va `rsync`:
 
 ```bash
 sudo apt update
 sudo apt install -y openssh-server rsync
 ```
 
-Sau đó tạo thư mục lưu file:
+Tao thu muc luu file:
 
 ```bash
-sudo mkdir -p /srv/postgres-backups/primary
-sudo chown -R backupuser:backupuser /srv/postgres-backups/primary
+sudo mkdir -p /srv/postgres-backups/tech-blog
+sudo chmod 755 /srv
+sudo mkdir -p /srv/postgres-backups
+sudo chmod 755 /srv/postgres-backups
+sudo chmod 700 /srv/postgres-backups/tech-blog
 ```
 
-Tạo SSH key ở server chính:
+Tu bat ky thu muc nao, ban vao truc tiep bang duong dan tuyet doi:
 
 ```bash
-ssh-keygen -t ed25519 -f ./ssh/backup_ed25519 -N ""
-chmod 600 ./ssh/backup_ed25519
-ssh-copy-id -i ./ssh/backup_ed25519.pub backupuser@10.10.10.20
+cd /srv/postgres-backups/tech-blog
 ```
 
-Test SSH:
+Neu ban dang dung root cho server backup, khong can tao SSH key. Chi can dam bao dang nhap SSH bang password dang bat.
 
-```bash
-ssh -i ./ssh/backup_ed25519 backupuser@10.10.10.20
-```
+Neu SSH bang `root` bi chan, hay tao 1 user rieng de luu backup roi doi `BACKUP_REMOTE_USER`.
 
-## 4. Chạy PostgreSQL
+## 4. Chay PostgreSQL
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-Kiểm tra:
+Kiem tra:
 
 ```bash
-docker exec pg-primary pg_isready -U app_user -d app_db
+docker exec pg-primary pg_isready -U tech_blog_user -d tech_blog_db
 ```
 
-## 5. Chạy backup thử
+## 5. Chay backup thu
 
 ```bash
 chmod +x scripts/*.sh
@@ -119,15 +116,13 @@ chmod +x scripts/*.sh
 ./scripts/list_backups.sh
 ```
 
-Sau khi chạy xong, server backup sẽ có:
+Sau khi chay xong, server backup se co:
 
-- file `.dump` để restore database
-- file `_globals.sql` cho roles/quyền ở mức cluster
-- file `.sha256` để kiểm tra integrity
+- file `.dump` de restore database
+- file `_globals.sql` cho roles/quyen o muc cluster
+- file `.sha256` de kiem tra integrity
 
-## 6. Bật backup định kỳ
-
-Copy file `systemd`:
+## 6. Bat backup dinh ky
 
 ```bash
 sudo cp deploy/postgres-backup.service /etc/systemd/system/
@@ -137,9 +132,9 @@ sudo systemctl enable --now postgres-backup.timer
 sudo systemctl list-timers | grep postgres-backup
 ```
 
-Mặc định timer đang là `hourly`.
+Mac dinh timer dang la `hourly`.
 
-Nếu muốn backup mỗi ngày lúc 02:00 sáng, sửa `/etc/systemd/system/postgres-backup.timer`:
+Neu muon backup moi ngay luc 02:00 sang, sua `/etc/systemd/system/postgres-backup.timer`:
 
 ```ini
 [Timer]
@@ -148,16 +143,16 @@ Persistent=true
 Unit=postgres-backup.service
 ```
 
-Sau đó reload:
+Sau do reload:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart postgres-backup.timer
 ```
 
-## 7. Restore từ server backup
+## 7. Restore tu server backup
 
-Liệt kê danh sách backup:
+Liet ke danh sach backup:
 
 ```bash
 ./scripts/list_backups.sh
@@ -166,21 +161,22 @@ Liệt kê danh sách backup:
 Restore:
 
 ```bash
-./scripts/restore.sh primary_app_db_20260620_020000.dump
+./scripts/restore.sh primary_tech_blog_db_20260620_020000.dump
 ```
 
-Script sẽ:
+Script se:
 
-- tải file backup từ server backup nếu local chưa có
+- tai file backup tu server backup neu local chua co
 - verify checksum
-- restore roles từ file `_globals.sql`
-- drop và tạo lại database
-- restore dữ liệu từ file `.dump`
+- restore roles tu file `_globals.sql`
+- drop va tao lai database
+- restore du lieu tu file `.dump`
 
-## 8. Lưu ý quan trọng
+## 8. Luu y quan trong
 
-- Cách này phù hợp cho backup theo giờ/ngày và restore toàn DB.
-- Mẫu hiện tại đang backup 1 database chính trong biến `POSTGRES_DB`.
-- Nếu bạn cần point-in-time recovery, nên nâng cấp sang `pgBackRest` hoặc WAL archiving.
-- `restore.sh` sẽ ghi đè database hiện tại, nên chỉ chạy khi đã xác nhận downtime.
-- Nên giới hạn firewall chỉ cho phép app hoặc IP cần thiết truy cập cổng `5432`.
+- Cach nay phu hop cho backup theo gio/ngay va restore toan DB.
+- Mau hien tai dang backup 1 database chinh trong bien `POSTGRES_DB`.
+- Dung password de backup/restore la chay duoc ngay, nhung kem an toan hon SSH key.
+- `BACKUP_REMOTE_PASSWORD` nam trong `.env`, vi vay nen giu file nay quyen `600` va khong commit file `.env`.
+- `restore.sh` se ghi de database hien tai, nen chi chay khi da xac nhan downtime.
+- Neu can point-in-time recovery, nen nang cap sang `pgBackRest` hoac WAL archiving.

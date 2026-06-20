@@ -31,8 +31,8 @@ required_vars=(
   BACKUP_REMOTE_HOST
   BACKUP_REMOTE_PORT
   BACKUP_REMOTE_USER
+  BACKUP_REMOTE_PASSWORD
   BACKUP_REMOTE_DIR
-  BACKUP_SSH_KEY
 )
 
 for var_name in "${required_vars[@]}"; do
@@ -52,44 +52,31 @@ resolve_path() {
 }
 
 LOCAL_DIR="$(resolve_path "$BACKUP_LOCAL_DIR")"
-SSH_KEY="$(resolve_path "$BACKUP_SSH_KEY")"
 DUMP_FILE="$LOCAL_DIR/$BACKUP_NAME"
 GLOBALS_FILE="${DUMP_FILE%.dump}_globals.sql"
 CHECKSUM_FILE="${DUMP_FILE%.dump}.sha256"
 
 mkdir -p "$LOCAL_DIR"
 
-if [[ ! -f "$SSH_KEY" ]]; then
-  echo "Missing SSH key: $SSH_KEY"
-  exit 1
-fi
-
 if [[ "$(docker inspect -f '{{.State.Running}}' "$POSTGRES_CONTAINER_NAME" 2>/dev/null || true)" != "true" ]]; then
   echo "Container $POSTGRES_CONTAINER_NAME is not running."
   exit 1
 fi
 
-SSH_OPTS=(
-  -i "$SSH_KEY"
-  -p "$BACKUP_REMOTE_PORT"
-  -o BatchMode=yes
-  -o StrictHostKeyChecking=accept-new
-)
-
 if [[ ! -f "$DUMP_FILE" || ! -f "$GLOBALS_FILE" || ! -f "$CHECKSUM_FILE" ]]; then
   echo "Downloading backup from remote server"
-  rsync -az \
-    -e "ssh -i $SSH_KEY -p $BACKUP_REMOTE_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e rsync -az \
+    --rsh="ssh -p $BACKUP_REMOTE_PORT -o StrictHostKeyChecking=accept-new" \
     "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}:${BACKUP_REMOTE_DIR}/$BACKUP_NAME" \
     "$DUMP_FILE"
 
-  rsync -az \
-    -e "ssh -i $SSH_KEY -p $BACKUP_REMOTE_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e rsync -az \
+    --rsh="ssh -p $BACKUP_REMOTE_PORT -o StrictHostKeyChecking=accept-new" \
     "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}:${BACKUP_REMOTE_DIR}/$(basename "$GLOBALS_FILE")" \
     "$GLOBALS_FILE"
 
-  rsync -az \
-    -e "ssh -i $SSH_KEY -p $BACKUP_REMOTE_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  SSHPASS="$BACKUP_REMOTE_PASSWORD" sshpass -e rsync -az \
+    --rsh="ssh -p $BACKUP_REMOTE_PORT -o StrictHostKeyChecking=accept-new" \
     "${BACKUP_REMOTE_USER}@${BACKUP_REMOTE_HOST}:${BACKUP_REMOTE_DIR}/$(basename "$CHECKSUM_FILE")" \
     "$CHECKSUM_FILE"
 fi
