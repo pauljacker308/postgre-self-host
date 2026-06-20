@@ -110,7 +110,11 @@ docker exec pg-primary pg_isready -U tech_blog_user -d tech_blog_db
 
 ## 4.1. Luu y khi len PostgreSQL 18
 
-PostgreSQL 18 tren Docker official image da doi thu muc du lieu mac dinh theo major version. Vi vay file `docker-compose.yml` trong repo nay mount volume vao `/var/lib/postgresql` thay vi `/var/lib/postgresql/data`.
+PostgreSQL 18 tren Docker official image da doi thu muc du lieu mac dinh theo major version. Vi vay file `docker-compose.yml` trong repo nay:
+
+- mount volume vao `/var/lib/postgresql` thay vi `/var/lib/postgresql/data`
+- set ro `PGDATA=/var/lib/postgresql/18/docker`
+- dung volume moi ten `postgres18_data` de tranh dinh lai volume cu cua PostgreSQL 16
 
 Neu ban dang chay moi tu dau thi khong can lam gi them.
 
@@ -123,6 +127,19 @@ docker volume ls
 ```
 
 Sau do dung cach backup/restore de dua du lieu sang instance PostgreSQL 18 moi, hoac lam major upgrade rieng. Nhu vay se an toan hon viec dung chung volume cu.
+
+Neu ban chi muon chay moi lai cho sach sau khi `git pull`, dung:
+
+```bash
+cd /opt/postgre-self-host
+git pull origin main
+docker compose down
+docker compose up -d
+docker compose ps
+docker logs --tail 100 pg-primary
+```
+
+Neu tren may van con volume cu `postgre-self-host_postgres_data` cua PostgreSQL 16 thi cung khong sao, vi ban compose moi se dung volume `postgre-self-host_postgres18_data`.
 
 ## 5. Chay backup thu
 
