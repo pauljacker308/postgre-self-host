@@ -46,7 +46,7 @@ chmod 600 .env
 Sua `.env` theo moi truong that:
 
 ```env
-POSTGRES_VERSION=16
+POSTGRES_VERSION=18
 POSTGRES_CONTAINER_NAME=pg-primary
 POSTGRES_PORT=5432
 POSTGRES_DB=tech_blog_db
@@ -107,6 +107,22 @@ Kiem tra:
 ```bash
 docker exec pg-primary pg_isready -U tech_blog_user -d tech_blog_db
 ```
+
+## 4.1. Luu y khi len PostgreSQL 18
+
+PostgreSQL 18 tren Docker official image da doi thu muc du lieu mac dinh theo major version. Vi vay file `docker-compose.yml` trong repo nay mount volume vao `/var/lib/postgresql` thay vi `/var/lib/postgresql/data`.
+
+Neu ban dang chay moi tu dau thi khong can lam gi them.
+
+Neu ban dang co data PostgreSQL 16 tu volume cu, khong nen chi doi image roi `docker compose up -d`. Cach an toan la:
+
+```bash
+./scripts/backup.sh
+docker compose down
+docker volume ls
+```
+
+Sau do dung cach backup/restore de dua du lieu sang instance PostgreSQL 18 moi, hoac lam major upgrade rieng. Nhu vay se an toan hon viec dung chung volume cu.
 
 ## 5. Chay backup thu
 
