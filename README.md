@@ -205,6 +205,8 @@ Script se:
 - drop va tao lai database
 - restore du lieu tu file `.dump`
 
+Neu role da ton tai san, buoc restore `globals` co the in ra loi `already exists`. Script se bo qua cac loi nay va tiep tuc restore database.
+
 ## 8. Luu y quan trong
 
 - Cach nay phu hop cho backup theo gio/ngay va restore toan DB.

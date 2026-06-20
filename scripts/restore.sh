@@ -86,8 +86,11 @@ echo "Verifying checksum"
 
 echo "Restoring global roles if present"
 if [[ -f "$GLOBALS_FILE" ]]; then
-  cat "$GLOBALS_FILE" | docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" "$POSTGRES_CONTAINER_NAME" \
-    psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres
+  echo "Existing roles may trigger harmless errors during globals restore."
+  if ! cat "$GLOBALS_FILE" | docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" "$POSTGRES_CONTAINER_NAME" \
+    psql -v ON_ERROR_STOP=0 -U "$POSTGRES_USER" -d postgres; then
+    echo "Warning: globals restore could not be completed cleanly. Continuing with database restore."
+  fi
 fi
 
 echo "Terminating active sessions"
