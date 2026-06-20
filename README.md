@@ -1,25 +1,25 @@
-# PostgreSQL self-host bang Docker + backup sang server khac
+# PostgreSQL self-host bằng Docker + backup sang server khác
 
-Project nay giup ban:
+Project này giúp bạn:
 
-- chay PostgreSQL tren Ubuntu bang Docker Compose
-- backup dinh ky bang `pg_dump`
-- day file backup sang 1 server khac qua SSH password
-- restore nguoc tu file backup khi can
+- chạy PostgreSQL trên Ubuntu bằng Docker Compose
+- backup định kỳ bằng `pg_dump`
+- đẩy file backup sang 1 server khác qua SSH password
+- restore ngược từ file backup khi cần
 
-## 1. Cau truc
+## 1. Cấu trúc
 
-- `docker-compose.yml`: chay PostgreSQL
-- `.env.example`: bien moi truong mau
-- `scripts/backup.sh`: tao backup va copy sang server backup
-- `scripts/list_backups.sh`: liet ke backup dang co tren server backup
-- `scripts/restore.sh`: tai file backup ve va restore
+- `docker-compose.yml`: chạy PostgreSQL
+- `.env.example`: biến môi trường mẫu
+- `scripts/backup.sh`: tạo backup và copy sang server backup
+- `scripts/list_backups.sh`: liệt kê backup đang có trên server backup
+- `scripts/restore.sh`: tải file backup về và restore
 - `deploy/postgres-backup.service`: service `systemd`
 - `deploy/postgres-backup.timer`: timer `systemd`
 
-## 2. Chuan bi tren Ubuntu chinh
+## 2. Chuẩn bị trên Ubuntu chính
 
-### Cai Docker va cong cu backup
+### Cài Docker và công cụ backup
 
 ```bash
 sudo apt update
@@ -27,7 +27,7 @@ sudo apt install -y docker.io docker-compose-plugin rsync openssh-client sshpass
 sudo systemctl enable --now docker
 ```
 
-### Copy project len server
+### Copy project lên server
 
 ```bash
 sudo mkdir -p /opt/postgre-self-host
@@ -35,7 +35,7 @@ sudo chown -R "$USER":"$USER" /opt/postgre-self-host
 cd /opt/postgre-self-host
 ```
 
-### Tao file `.env`
+### Tạo file `.env`
 
 ```bash
 cp .env.example .env
@@ -43,7 +43,7 @@ mkdir -p backups/local
 chmod 600 .env
 ```
 
-Sua `.env` theo moi truong that:
+Sửa `.env` theo môi trường thật:
 
 ```env
 POSTGRES_VERSION=18
@@ -66,16 +66,23 @@ BACKUP_REMOTE_PASSWORD=strong_remote_password_here
 BACKUP_REMOTE_DIR=/srv/postgres-backups/tech-blog
 ```
 
-## 3. Chuan bi server backup
+Lưu ý: nếu password có ký tự đặc biệt như `#`, `&`, `@`, hãy bọc bằng nháy đơn:
 
-Server backup nen co `openssh-server` va `rsync`:
+```env
+POSTGRES_PASSWORD='4#xd&Tae@H5x3bD'
+BACKUP_REMOTE_PASSWORD='4#xd&Tae@H5x3bD'
+```
+
+## 3. Chuẩn bị server backup
+
+Server backup nên có `openssh-server` và `rsync`:
 
 ```bash
 sudo apt update
 sudo apt install -y openssh-server rsync
 ```
 
-Tao thu muc luu file:
+Tạo thư mục lưu file:
 
 ```bash
 sudo mkdir -p /srv/postgres-backups/tech-blog
@@ -85,40 +92,40 @@ sudo chmod 755 /srv/postgres-backups
 sudo chmod 700 /srv/postgres-backups/tech-blog
 ```
 
-Tu bat ky thu muc nao, ban vao truc tiep bang duong dan tuyet doi:
+Từ bất kỳ thư mục nào, bạn vào trực tiếp bằng đường dẫn tuyệt đối:
 
 ```bash
 cd /srv/postgres-backups/tech-blog
 ```
 
-Neu ban dang dung root cho server backup, khong can tao SSH key. Chi can dam bao dang nhap SSH bang password dang bat.
+Nếu bạn đang dùng `root` cho server backup, không cần tạo SSH key. Chỉ cần đảm bảo đăng nhập SSH bằng password đang bật.
 
-Neu SSH bang `root` bi chan, hay tao 1 user rieng de luu backup roi doi `BACKUP_REMOTE_USER`.
+Nếu SSH bằng `root` bị chặn, hãy tạo 1 user riêng để lưu backup rồi đổi `BACKUP_REMOTE_USER`.
 
-## 4. Chay PostgreSQL
+## 4. Chạy PostgreSQL
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-Kiem tra:
+Kiểm tra:
 
 ```bash
 docker exec pg-primary pg_isready -U tech_blog_user -d tech_blog_db
 ```
 
-## 4.1. Luu y khi len PostgreSQL 18
+## 4.1. Lưu ý khi lên PostgreSQL 18
 
-PostgreSQL 18 tren Docker official image da doi thu muc du lieu mac dinh theo major version. Vi vay file `docker-compose.yml` trong repo nay:
+PostgreSQL 18 trên Docker official image đã đổi thư mục dữ liệu mặc định theo major version. Vì vậy file `docker-compose.yml` trong repo này:
 
-- mount volume vao `/var/lib/postgresql` thay vi `/var/lib/postgresql/data`
-- set ro `PGDATA=/var/lib/postgresql/18/docker`
-- dung volume moi ten `postgres18_data` de tranh dinh lai volume cu cua PostgreSQL 16
+- mount volume vào `/var/lib/postgresql` thay vì `/var/lib/postgresql/data`
+- set rõ `PGDATA=/var/lib/postgresql/18/docker`
+- dùng volume mới tên `postgres18_data` để tránh dính lại volume cũ của PostgreSQL 16
 
-Neu ban dang chay moi tu dau thi khong can lam gi them.
+Nếu bạn đang chạy mới từ đầu thì không cần làm gì thêm.
 
-Neu ban dang co data PostgreSQL 16 tu volume cu, khong nen chi doi image roi `docker compose up -d`. Cach an toan la:
+Nếu bạn đang có data PostgreSQL 16 từ volume cũ, không nên chỉ đổi image rồi `docker compose up -d`. Cách an toàn là:
 
 ```bash
 ./scripts/backup.sh
@@ -126,9 +133,9 @@ docker compose down
 docker volume ls
 ```
 
-Sau do dung cach backup/restore de dua du lieu sang instance PostgreSQL 18 moi, hoac lam major upgrade rieng. Nhu vay se an toan hon viec dung chung volume cu.
+Sau đó dùng cách backup/restore để đưa dữ liệu sang instance PostgreSQL 18 mới, hoặc làm major upgrade riêng. Như vậy sẽ an toàn hơn việc dùng chung volume cũ.
 
-Neu ban chi muon chay moi lai cho sach sau khi `git pull`, dung:
+Nếu bạn chỉ muốn chạy mới lại cho sạch sau khi `git pull`, dùng:
 
 ```bash
 cd /opt/postgre-self-host
@@ -139,9 +146,9 @@ docker compose ps
 docker logs --tail 100 pg-primary
 ```
 
-Neu tren may van con volume cu `postgre-self-host_postgres_data` cua PostgreSQL 16 thi cung khong sao, vi ban compose moi se dung volume `postgre-self-host_postgres18_data`.
+Nếu trên máy vẫn còn volume cũ `postgre-self-host_postgres_data` của PostgreSQL 16 thì cũng không sao, vì bản compose mới sẽ dùng volume `postgre-self-host_postgres18_data`.
 
-## 5. Chay backup thu
+## 5. Chạy backup thử
 
 ```bash
 chmod +x scripts/*.sh
@@ -149,42 +156,42 @@ chmod +x scripts/*.sh
 ./scripts/list_backups.sh
 ```
 
-Sau khi chay xong, server backup se co:
+Sau khi chạy xong, server backup sẽ có:
 
-- file `.dump` de restore database
-- file `_globals.sql` cho roles/quyen o muc cluster
-- file `.sha256` de kiem tra integrity
+- file `.dump` để restore database
+- file `_globals.sql` cho roles/quyền ở mức cluster
+- file `.sha256` để kiểm tra integrity
 
-## 5.1. Cach backup thu cong tung buoc
+## 5.1. Cách backup thủ công từng bước
 
-Khi can tao backup ngay lap tuc tren server chinh, chay:
+Khi cần tạo backup ngay lập tức trên server chính, chạy:
 
 ```bash
 cd /opt/postgre-self-host
 ./scripts/backup.sh
 ```
 
-Sau khi chay xong, kiem tra danh sach backup dang co tren server backup:
+Sau khi chạy xong, kiểm tra danh sách backup đang có trên server backup:
 
 ```bash
 ./scripts/list_backups.sh
 ```
 
-Neu muon kiem tra truc tiep tren server backup:
+Nếu muốn kiểm tra trực tiếp trên server backup:
 
 ```bash
 cd /srv/postgres-backups/tech-blog
 ls -lah
 ```
 
-Quy trinh backup thu cong nen lam theo thu tu:
+Quy trình backup thủ công nên làm theo thứ tự:
 
-1. Xac nhan PostgreSQL dang chay.
-2. Chay `./scripts/backup.sh`.
-3. Chay `./scripts/list_backups.sh`.
-4. Kiem tra tren server backup da co file `.dump`, `_globals.sql`, `.sha256`.
+1. Xác nhận PostgreSQL đang chạy.
+2. Chạy `./scripts/backup.sh`.
+3. Chạy `./scripts/list_backups.sh`.
+4. Kiểm tra trên server backup đã có file `.dump`, `_globals.sql`, `.sha256`.
 
-## 6. Bat backup dinh ky
+## 6. Bật backup định kỳ
 
 ```bash
 sudo cp deploy/postgres-backup.service /etc/systemd/system/
@@ -194,16 +201,16 @@ sudo systemctl enable --now postgres-backup.timer
 sudo systemctl list-timers | grep postgres-backup
 ```
 
-Mac dinh timer dang la `hourly`, tuc la hien tai chua backup theo ngay.
+Mặc định timer trong repo đang là backup mỗi ngày lúc `02:00` sáng.
 
-Neu muon chay backup ngay lap tuc bang systemd ma khong doi lich:
+Nếu muốn chạy backup ngay lập tức bằng systemd mà không đợi lịch:
 
 ```bash
 sudo systemctl start postgres-backup.service
 sudo systemctl status postgres-backup.service
 ```
 
-Neu muon backup moi ngay luc 02:00 sang, sua `/etc/systemd/system/postgres-backup.timer`:
+Nếu bạn đã copy timer cũ từ trước đó, hãy sửa `/etc/systemd/system/postgres-backup.timer` thành:
 
 ```ini
 [Timer]
@@ -212,23 +219,35 @@ Persistent=true
 Unit=postgres-backup.service
 ```
 
-Sau do reload:
+Sau đó reload:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart postgres-backup.timer
 ```
 
-Sau khi doi sang daily, kiem tra lich:
+Sau khi đổi sang daily, kiểm tra lịch:
 
 ```bash
 sudo systemctl list-timers | grep postgres-backup
 systemctl cat postgres-backup.timer
 ```
 
-## 7. Restore tu server backup
+Nếu bạn vừa `git pull` bản mới trên VPS và muốn áp dụng timer daily ngay, chạy lại:
 
-Liet ke danh sach backup:
+```bash
+cd /opt/postgre-self-host
+sudo cp deploy/postgres-backup.timer /etc/systemd/system/
+sudo cp deploy/postgres-backup.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart postgres-backup.timer
+sudo systemctl enable --now postgres-backup.timer
+sudo systemctl list-timers | grep postgres-backup
+```
+
+## 7. Restore từ server backup
+
+Liệt kê danh sách backup:
 
 ```bash
 ./scripts/list_backups.sh
@@ -240,26 +259,26 @@ Restore:
 ./scripts/restore.sh primary_tech_blog_db_20260620_020000.dump
 ```
 
-Script se:
+Script sẽ:
 
-- tai file backup tu server backup neu local chua co
+- tải file backup từ server backup nếu local chưa có
 - verify checksum
-- restore roles tu file `_globals.sql`
-- drop va tao lai database
-- restore du lieu tu file `.dump`
+- restore roles từ file `_globals.sql`
+- drop và tạo lại database
+- restore dữ liệu từ file `.dump`
 
-Neu role da ton tai san, buoc restore `globals` co the in ra loi `already exists`. Script se bo qua cac loi nay va tiep tuc restore database.
+Nếu role đã tồn tại sẵn, bước restore `globals` có thể in ra lỗi `already exists`. Script sẽ bỏ qua các lỗi này và tiếp tục restore database.
 
-## 7.1. Cach restore thu cong tung buoc
+## 7.1. Cách restore thủ công từng bước
 
-Khi can khoi phuc database tu 1 file backup cu the, lam theo thu tu:
+Khi cần khôi phục database từ 1 file backup cụ thể, làm theo thứ tự:
 
-1. Xac dinh file backup can dung bang `./scripts/list_backups.sh`.
-2. Dam bao ban chap nhan ghi de toan bo database hien tai.
-3. Chay lenh restore voi ten file dump.
-4. Kiem tra lai bang table hoac du lieu sau restore.
+1. Xác định file backup cần dùng bằng `./scripts/list_backups.sh`.
+2. Đảm bảo bạn chấp nhận ghi đè toàn bộ database hiện tại.
+3. Chạy lệnh restore với tên file dump.
+4. Kiểm tra lại bảng hoặc dữ liệu sau restore.
 
-Lenh mau:
+Lệnh mẫu:
 
 ```bash
 cd /opt/postgre-self-host
@@ -267,7 +286,7 @@ cd /opt/postgre-self-host
 ./scripts/restore.sh primary_tech_blog_db_20260620_215653.dump
 ```
 
-Kiem tra lai sau restore:
+Kiểm tra lại sau restore:
 
 ```bash
 docker exec -e PGPASSWORD='your_db_password' pg-primary \
@@ -277,19 +296,19 @@ docker exec -e PGPASSWORD='your_db_password' pg-primary \
   psql -U tech_blog_user -d tech_blog_db -c "SELECT * FROM backup_test;"
 ```
 
-Neu ban chi muon test restore, nen:
+Nếu bạn chỉ muốn test restore, nên:
 
-1. Tao 1 record mau.
-2. Chay backup.
-3. Xoa record do.
-4. Chay restore tu file backup vua tao.
-5. Kiem tra record da quay lai hay chua.
+1. Tạo 1 record mẫu.
+2. Chạy backup.
+3. Xóa record đó.
+4. Chạy restore từ file backup vừa tạo.
+5. Kiểm tra record đã quay lại hay chưa.
 
-## 8. Luu y quan trong
+## 8. Lưu ý quan trọng
 
-- Cach nay phu hop cho backup theo gio/ngay va restore toan DB.
-- Mau hien tai dang backup 1 database chinh trong bien `POSTGRES_DB`.
-- Dung password de backup/restore la chay duoc ngay, nhung kem an toan hon SSH key.
-- `BACKUP_REMOTE_PASSWORD` nam trong `.env`, vi vay nen giu file nay quyen `600` va khong commit file `.env`.
-- `restore.sh` se ghi de database hien tai, nen chi chay khi da xac nhan downtime.
-- Neu can point-in-time recovery, nen nang cap sang `pgBackRest` hoac WAL archiving.
+- Cách này phù hợp cho backup theo giờ/ngày và restore toàn DB.
+- Mẫu hiện tại đang backup 1 database chính trong biến `POSTGRES_DB`.
+- Dùng password để backup/restore là chạy được ngay, nhưng kém an toàn hơn SSH key.
+- `BACKUP_REMOTE_PASSWORD` nằm trong `.env`, vì vậy nên giữ file này quyền `600` và không commit file `.env`.
+- `restore.sh` sẽ ghi đè database hiện tại, nên chỉ chạy khi đã xác nhận downtime.
+- Nếu cần point-in-time recovery, nên nâng cấp sang `pgBackRest` hoặc WAL archiving.
